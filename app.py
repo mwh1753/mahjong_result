@@ -65,3 +65,19 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
                 end_time_str = end_time_raw.replace(":", "")
 
                 final_text = f"{game_number}\n{start_time}~{end_time_str}\n"
+                
+                players = sorted(data["players"], key=lambda x: x["rank"])
+                for player in players:
+                    rank = player["rank"]
+                    nickname = player["nickname"]
+                    score = player["score"]
+                    
+                    real_name = NAME_DICTIONARY.get(nickname.strip(), nickname)
+                    uma_str = calculate_uma(score)
+                    final_text += f"{rank}. {real_name} {score} {uma_str}\n"
+
+                st.success("✨ 추출이 완료되었습니다!")
+                st.text_area("결과 (클릭해서 `Ctrl+C` 로 복사하세요)", final_text, height=180)
+                
+            except Exception as e:
+                st.error(f"오류가 발생했습니다: {e}")
