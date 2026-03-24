@@ -6,7 +6,7 @@ from PIL import Image
 from streamlit_paste_button import paste_image_button
 
 # ------------------------------------------------
-# 1. 닉네임 사전 (순수 명단만 유지)
+# 1. 닉네임 사전
 # ------------------------------------------------
 NAME_DICTIONARY = {
     "keichi": "정훈", "sleeeeeeeep": "도균", "이쁜괜티": "규빈", "김근머": "근영",
@@ -21,7 +21,6 @@ NAME_DICTIONARY = {
     "한국의기술": "유준", "Kyorang": "교창"
 }
 
-# AI가 참고할 수 있게 닉네임 원본 명단만 따로 뽑아둠
 VALID_NICKNAMES = list(NAME_DICTIONARY.keys())
 
 def calculate_uma(score):
@@ -31,7 +30,9 @@ def calculate_uma(score):
 # ------------------------------------------------
 # 2. 웹 앱 화면 구성
 # ------------------------------------------------
+# (인터넷 창 탭 아이콘은 유지해 두었습니다)
 st.set_page_config(page_title="작혼 전적 정리기", page_icon="icon.png", layout="centered")
+st.title("🀄 작혼 전적 자동 정리 도구")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -65,7 +66,6 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
     else:
         with st.spinner("AI가 이미지를 분석 중입니다..."):
             try:
-                # 1. AI API 호출 및 명단 기반 인식
                 api_key = st.secrets["GEMINI_API_KEY"]
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel('gemini-2.5-flash')
@@ -85,7 +85,6 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
                 result_text = response.text.strip().replace("```json", "").replace("```", "")
                 data = json.loads(result_text)
 
-                # 2. 종료 시간 처리 (수동 입력 최우선)
                 ai_end_time = data.get("end_time", "").replace(":", "")
                 final_end_time = end_time_input if end_time_input else ai_end_time
                 
@@ -93,7 +92,6 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
                     st.warning("⚠️ 사진에서 종료 시간을 찾지 못했습니다. 왼쪽 '종료 시간' 칸에 직접 입력해 주세요!")
                     st.stop()
 
-                # 3. 텍스트 조립 및 difflib 유사도 기반 오타 자동 교정
                 final_text = f"{game_number}\n{start_time}~{final_end_time}\n"
                 players = sorted(data["players"], key=lambda x: x["rank"])
                 
@@ -102,18 +100,15 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
                     ai_nickname = player["nickname"].strip()
                     score = player["score"]
                     
-                    # AI가 읽어온 이름이 사전에 없다면, 가장 비슷한 이름을 찾아냄 (일치율 40% 이상)
                     if ai_nickname not in NAME_DICTIONARY:
                         closest_matches = difflib.get_close_matches(ai_nickname, NAME_DICTIONARY.keys(), n=1, cutoff=0.4)
                         if closest_matches:
                             ai_nickname = closest_matches[0] 
 
-                    # 최종적으로 실제 이름(본명)으로 변환
                     real_name = NAME_DICTIONARY.get(ai_nickname, ai_nickname)
                     uma_str = calculate_uma(score)
                     final_text += f"{rank}. {real_name} {score} {uma_str}\n"
 
-                # 4. 결과 출력
                 st.success("✨ 추출이 완료되었습니다! 아래 상자 오른쪽 위의 📋 복사 아이콘을 누르세요.")
                 st.code(final_text, language="plaintext")
                 
