@@ -135,8 +135,9 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
                     uma_str = calculate_uma(score)
                     final_text += f"{rank}. {real_name} {score} {uma_str}\n"
 
-                st.success("✨ 추출이 완료되었습니다!")
-                st.text_area("결과 (클릭해서 `Ctrl+C` 로 복사하세요)", final_text, height=180)
+                st.success("✨ 추출이 완료되었습니다! 아래 상자 오른쪽 위의 📋 복사 아이콘을 누르세요.")
+                # 🌟 결과 텍스트를 복사 버튼이 있는 코드 블록으로 출력
+                st.code(final_text, language="plaintext")
                 
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
