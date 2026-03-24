@@ -27,8 +27,7 @@ st.title("🀄 작혼 전적 자동 정리 도구")
 
 col1, col2 = st.columns(2)
 with col1:
-    # 🌟 파일 업로드 문구를 붙여넣기 친화적으로 수정
-    uploaded_file = st.file_uploader("📂 점선 박스를 클릭하고 [Ctrl + V]를 눌러 이미지를 붙여넣으세요!", type=["png", "jpg", "jpeg"])
+    uploaded_file = st.file_uploader("📂 박스를 클릭하고 [Ctrl + V]를 눌러 붙여넣으세요!", type=["png", "jpg", "jpeg"])
     game_number = st.text_input("게임 번호를 입력하세요", placeholder="예: 228")
     start_time = st.text_input("시작 시간을 입력하세요", placeholder="예: 2322")
     end_time = st.text_input("종료 시간을 입력하세요", placeholder="예: 0028")
@@ -56,4 +55,27 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
 
                 prompt = """
                 이 이미지는 마작 게임 작혼의 결과 화면이야. 1위부터 4위까지의 '순위(rank)', '닉네임(nickname)', '점수(score)'만 추출해줘. 반드시 아래 JSON 형식으로만 대답해. 마크다운 기호 없이 순수 JSON 텍스트만 출력해.
-                {"players": [{"rank": 1, "nickname":
+                {"players": [{"rank": 1, "nickname": "gtrhdea", "score": 33900}]}
+                """
+                
+                response = model.generate_content([prompt, img])
+                result_text = response.text.strip().replace("```json", "").replace("```", "")
+                data = json.loads(result_text)
+
+                final_text = f"{game_number}\n{start_time}~{end_time}\n"
+                
+                players = sorted(data["players"], key=lambda x: x["rank"])
+                for player in players:
+                    rank = player["rank"]
+                    nickname = player["nickname"]
+                    score = player["score"]
+                    
+                    real_name = NAME_DICTIONARY.get(nickname.strip(), nickname)
+                    uma_str = calculate_uma(score)
+                    final_text += f"{rank}. {real_name} {score} {uma_str}\n"
+
+                st.success("✨ 추출이 완료되었습니다!")
+                st.text_area("결과 (클릭해서 `Ctrl+C` 로 복사하세요)", final_text, height=180)
+                
+            except Exception as e:
+                st.error(f"오류가 발생했습니다: {e}")
