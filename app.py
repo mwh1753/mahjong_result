@@ -1,66 +1,38 @@
 import streamlit as st
 import google.generativeai as genai
 import json
+import difflib # 🌟 글자 유사도 검사를 위한 파이썬 기본 부품!
 from PIL import Image
 from streamlit_paste_button import paste_image_button
 
 # ------------------------------------------------
-# 1. 닉네임 사전 및 우마 계산 함수 (초대규모 오타 방어망 적용)
+# 1. 닉네임 사전 (이제 오타는 안 적어도 됩니다! 진짜 닉네임만 남김)
+# ------------------------------------------------
 NAME_DICTIONARY = {
-    # ---------------------------------------------
-    # 🔠 알파벳/숫자 혼동 완벽 방어 (l, I, 1, e, c, n, m, 0, o)
-    # ---------------------------------------------
-    "keichi": "정훈", "kelchi": "정훈", "ketchi": "정훈", "keichl": "정훈", "keich1": "정훈", "k0ichi": "정훈",
-    "sleeeeeeeep": "도균", "sleeeeeeep": "도균", "sleeeeeeeeep": "도균", "s1eeeeeeeep": "도균", "sIeeeeeeeep": "도균", "sleeeeeeeep": "도균",
-    "koyume": "동욱", "koynme": "동욱", "kcyume": "동욱", "k0yume": "동욱", "keyume": "동욱",
-    "babysunfish": "선일", "babysunf1sh": "선일", "hahysunfish": "선일", "babysuntish": "선일",
-    "jeezjz": "지성", "jeezj2": "지성", "jee2jz": "지성", "jeczjz": "지성", "jeczj2": "지성",
-    "MANKURU": "태욱", "MANKURV": "태욱", "MANKUKU": "태욱", "MANKUPU": "태욱",
-    "lecon": "동희", "Iecon": "동희", "1econ": "동희", "lacon": "동희", "lceon": "동희",
-    "tminid": "박정우", "tminld": "박정우", "tmInid": "박정우", "tmin1d": "박정우", "tminjd": "박정우",
-    "Maeil": "근협", "MaeiI": "근협", "Maei1": "근협", "Meeil": "근협", "MaelI": "근협",
-    "wakhang": "정완", "wakhong": "정완", "wekhang": "정완", "wakheng": "정완",
-    "joyhome": "이정우", "jcyhome": "이정우", "joyhoma": "이정우", "j0yhome": "이정우", "juyhome": "이정우",
-    "gtrhdea": "정학", "gtrhdee": "정학", "ytrhdea": "정학", "gtrhdoa": "정학",
-    "Reippah": "종현", "Reippeh": "종현", "Relppah": "종현", "ReIppah": "종현", "Re1ppah": "종현",
-    "hoshizoraaaa": "창민", "hoshizoraaa": "창민", "hoshlzoraaaa": "창민", "hoshizoreaaa": "창민",
-    "zxxzxx": "승현", "2xx2xx": "승현", "zxx2xx": "승현", "zxxzXx": "승현",
-    "lJpuddingl": "재형", "1Jpudding1": "재형", "IJpuddingI": "재형", "lJpudding1": "재형", "lJpudd1ngl": "재형",
-    "Kyorang": "교창", "Kyarang": "교창", "Kyoreng": "교창", "Ky0rang": "교창",
-
-    # ---------------------------------------------
-    # 🇰🇷 한글 자음/모음/받침 혼동 완벽 방어
-    # ---------------------------------------------
-    "이쁜괜티": "규빈", "이쁜괜히": "규빈", "이픈괜티": "규빈", "이쁜쾐티": "규빈", "아쁜괜티": "규빈", "이쁜관티": "규빈", "이쁜권티": "규빈", "이쁜괜다": "규빈",
-    "김근머": "근영", "김근며": "근영", "길근머": "근영", "감근머": "근영", "킴근머": "근영", "김긴머": "근영", "김근미": "근영",
-    "테라짐": "도헌", "데라짐": "도헌", "테라잠": "도헌", "톄라짐": "도헌", "터라짐": "도헌", "테리짐": "도헌",
-    "하루를영원히": "민철", "하루룰영원히": "민철", "하루를영원히": "민철", "하루를영윈히": "민철", "히루를영원히": "민철", "하루를영원히": "민철", "하루를영원하": "민철",
-    "넘버걸": "범진", "넙버걸": "범진", "넘버결": "범진", "님버걸": "범진", "넘버길": "범진", "넌버걸": "범진",
-    "새벽녕": "재현", "새벽명": "재현", "세벽녕": "재현", "새벽령": "재현", "새벽넝": "재현", "새벽영": "재현",
-    "제라툴": "재훈", "계라툴": "재훈", "재라툴": "재훈", "제리툴": "재훈", "제라틀": "재훈",
-    "시나몬샐러드": "나경", "시나몬셀러드": "나경", "사나몬샐러드": "나경", "시나몬살러드": "나경", "시나문샐러드": "나경",
-    "쉿자는중": "지완", "찻자는중": "지완", "숫자는중": "지완", "솟자는중": "지완", "찾자는중": "지완", "쉿자느중": "지완", "쉿지눈중": "지완", "쉿자는종": "지완",
-    "오천리더": "재윤", "으천리더": "재윤", "오천라더": "재윤", "오친리더": "재윤", "어천리더": "재윤", "옴천리더": "재윤",
-    "닷시마": "혜림", "딧시마": "혜림", "닫시마": "혜림", "맛시마": "혜림", "닺시마": "혜림", "댯시마": "혜림", "단시마": "혜림", "닽시마": "혜림",
-    "스도리": "태민", "스도라": "태민", "츠도리": "태민", "스두리": "태민", "수도리": "태민",
-    "찐빵vs호빵": "두찬", "찐빵vS호빵": "두찬", "찐빵VS호빵": "두찬", "짠빵vs호빵": "두찬", "찐빵vs후빵": "두찬", "찐방vs호빵": "두찬", "찐빵vs호방": "두찬",
-    "밤하늘먹구름": "승훈", "밤하늘벅구름": "승훈", "밤하늘먹꾸름": "승훈", "빔하늘먹구름": "승훈", "밤하닐먹구름": "승훈", "밤하늘먹구림": "승훈",
-    "소외감": "우영", "소의감": "우영", "스외감": "우영", "쇠외감": "우영", "초외감": "우영", "소외강": "우영", "수외감": "우영",
-    "가우르구라원툴": "상현", "가오르구라원툴": "상현", "기우르구라원툴": "상현", "가우르구리원툴": "상현", "가우르구라원틀": "상현",
-    "실루엣": "우재", "쉴루엣": "우재", "설루엣": "우재", "살루엣": "우재", "실루엇": "우재", "실루엔": "우재",
-    "한국의기술": "유준", "한극의기술": "유준", "한국이기술": "유준", "힌국의기술": "유준", "한국의가술": "유준",
-
-    # ---------------------------------------------
-    # 🇯🇵 일본어/한자/특수기호 혼동 완벽 방어
-    # ---------------------------------------------
-    "うああつあ": "우혁", "うあぁつあ": "우혁", "ぅああつあ": "우혁", "5ああつあ": "우혁", "うおあつあ": "우혁",
-    "平澤文": "기형", "平沢文": "기형", "乎澤文": "기형", "苹澤文": "기형", "平洋文": "기형",
-    "あやフブミオ": "재욱", "あやフプミオ": "재욱", "あやフフミオ": "재욱", "おやフブミオ": "재욱"
+    "keichi": "정훈", "sleeeeeeeep": "도균", "이쁜괜티": "규빈", "김근머": "근영",
+    "테라짐": "도헌", "koyume": "동욱", "하루를영원히": "민철", "넘버걸": "범진",
+    "babysunfish": "선일", "새벽녕": "재현", "jeezjz": "지성", "MANKURU": "태욱",
+    "제라툴": "재훈", "うああつあ": "우혁", "lecon": "동희", "平澤文": "기형",
+    "시나몬샐러드": "나경", "tminid": "박정우", "쉿자는중": "지완", "Maeil": "근협",
+    "오천리더": "재윤", "닷시마": "혜림", "wakhang": "정완", "あやフブミオ": "재욱",
+    "스도리": "태민", "찐빵vs호빵": "두찬", "밤하늘먹구름": "승훈", "joyhome": "이정우",
+    "gtrhdea": "정학", "Reippah": "종현", "hoshizoraaaa": "창민", "소외감": "우영",
+    "zxxzxx": "승현", "lJpuddingl": "재형", "가우르구라원툴": "상현", "실루엣": "우재",
+    "한국의기술": "유준", "Kyorang": "교창"
 }
+
+# AI가 참고할 수 있게 닉네임 원본 명단만 따로 뽑아둠
+VALID_NICKNAMES = list(NAME_DICTIONARY.keys())
 
 def calculate_uma(score):
     uma = (score - 25000) / 1000.0
     return f"+{uma:.1f}" if uma > 0 else f"{uma:.1f}"
+
+# 세션(임시) 저장소 초기화 설정
+if "temp_dict" not in st.session_state:
+    st.session_state.temp_dict = {}
+if "raw_ai_data" not in st.session_state:
+    st.session_state.raw_ai_data = None
 
 # ------------------------------------------------
 # 2. 웹 앱 화면 구성
@@ -92,7 +64,7 @@ with col2:
 st.divider()
 
 # ------------------------------------------------
-# 3. 데이터 추출 로직
+# 3. 데이터 추출 및 즉석 렌더링 로직
 # ------------------------------------------------
 if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
     if final_image is None or not game_number or not start_time:
@@ -100,49 +72,82 @@ if st.button("🚀 결과 텍스트 추출하기", use_container_width=True):
     else:
         with st.spinner("AI가 이미지를 분석 중입니다..."):
             try:
-                # 비밀 금고에서 API 키 가져오기
                 api_key = st.secrets["GEMINI_API_KEY"]
                 genai.configure(api_key=api_key)
-                
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 final_image.thumbnail((1024, 1024)) 
 
-                prompt = """
+                # 🌟 AI에게 닉네임 출석부를 통째로 쥐어주고 여기서만 고르라고 협박(?)함
+                prompt = f"""
                 이 이미지는 마작 게임 작혼의 결과 화면이야. 
                 1. 1위부터 4위까지의 '순위(rank)', '닉네임(nickname)', '점수(score)'를 추출해줘.
+                * 주의: 플레이어의 닉네임은 반드시 다음 명단 중에서 가장 비슷한 것을 골라서 적어! 글자가 뭉개졌어도 무조건 이 안에서 찾아야 해.
+                [명단: {', '.join(VALID_NICKNAMES)}]
+                
                 2. 화면(주로 우측 하단)에 '종료시간(end_time, HH:MM 형식)'이 있다면 추출하고, 만약 화면에 시간이 아예 없다면 end_time 값으로 빈 문자열("")을 줘.
                 반드시 아래 JSON 형식으로만 대답해. 마크다운 기호 없이 순수 JSON 텍스트만 출력해.
-                {"end_time": "22:21", "players": [{"rank": 1, "nickname": "gtrhdea", "score": 33900}]}
+                {{"end_time": "22:21", "players": [{{"rank": 1, "nickname": "gtrhdea", "score": 33900}}]}}
                 """
-                
                 response = model.generate_content([prompt, final_image])
                 result_text = response.text.strip().replace("```json", "").replace("```", "")
-                data = json.loads(result_text)
-
-                # 하이브리드 시간 로직: 내가 쓴 값 > AI가 찾은 값
-                ai_end_time = data.get("end_time", "").replace(":", "")
-                final_end_time = end_time_input if end_time_input else ai_end_time
                 
-                # 둘 다 없다면 에러 메시지
-                if not final_end_time:
-                    st.warning("⚠️ 사진에서 종료 시간을 찾지 못했습니다. 왼쪽 '종료 시간' 칸에 직접 입력해 주세요!")
-                    st.stop()
-
-                final_text = f"{game_number}\n{start_time}~{final_end_time}\n"
-                
-                players = sorted(data["players"], key=lambda x: x["rank"])
-                for player in players:
-                    rank = player["rank"]
-                    nickname = player["nickname"]
-                    score = player["score"]
-                    
-                    real_name = NAME_DICTIONARY.get(nickname.strip(), nickname)
-                    uma_str = calculate_uma(score)
-                    final_text += f"{rank}. {real_name} {score} {uma_str}\n"
-
-                st.success("✨ 추출이 완료되었습니다! 아래 상자 오른쪽 위의 📋 복사 아이콘을 누르세요.")
-                # 🌟 결과 텍스트를 복사 버튼이 있는 코드 블록으로 출력
-                st.code(final_text, language="plaintext")
+                st.session_state.raw_ai_data = json.loads(result_text)
+                st.success("✨ AI 분석 완료!")
                 
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
+
+if st.session_state.raw_ai_data:
+    data = st.session_state.raw_ai_data
+    
+    CURRENT_DICT = NAME_DICTIONARY.copy()
+    CURRENT_DICT.update(st.session_state.temp_dict)
+
+    ai_end_time = data.get("end_time", "").replace(":", "")
+    final_end_time = end_time_input if end_time_input else ai_end_time
+    
+    if not final_end_time:
+        st.warning("⚠️ 사진에서 종료 시간을 찾지 못했습니다. 왼쪽 '종료 시간' 칸에 직접 입력해 주세요!")
+        st.stop()
+
+    final_text = f"{game_number}\n{start_time}~{final_end_time}\n"
+    players = sorted(data["players"], key=lambda x: x["rank"])
+    
+    for player in players:
+        rank = player["rank"]
+        ai_nickname = player["nickname"].strip()
+        score = player["score"]
+        
+        # 🌟 [핵심] 파이썬 유사도 검사 (difflib)
+        # AI가 읽어온 닉네임이 원본 명단에 완벽히 일치하지 않더라도, 
+        # 글자 생김새가 40% 이상 비슷한 가장 유력한 닉네임을 알아서 찾아냅니다!
+        if ai_nickname not in CURRENT_DICT:
+            closest_matches = difflib.get_close_matches(ai_nickname, CURRENT_DICT.keys(), n=1, cutoff=0.4)
+            if closest_matches:
+                ai_nickname = closest_matches[0] # 가장 비슷한 닉네임으로 자동 교정!
+
+        real_name = CURRENT_DICT.get(ai_nickname, ai_nickname)
+        uma_str = calculate_uma(score)
+        final_text += f"{rank}. {real_name} {score} {uma_str}\n"
+
+    st.code(final_text, language="plaintext")
+
+    # ------------------------------------------------
+    # 4. 즉석 오타 교정기 UI (유사도 검사마저 실패했을 때를 대비한 최후의 보루)
+    # ------------------------------------------------
+    st.divider()
+    st.subheader("🛠️ 이름이 잘못 나왔나요? (즉석 교정기)")
+    st.caption("AI와 자동 교정기가 모두 틀렸다면, 원본 닉네임(예: 쉿자는중)이 아니라 **실제 이름(예: 지완)**을 우측에 바로 입력하세요!")
+    
+    col_t1, col_t2, col_t3 = st.columns([2, 2, 1])
+    with col_t1:
+        typo_input = st.text_input("결과창에 나온 오타", placeholder="예: 쉿자느중")
+    with col_t2:
+        correct_input = st.text_input("올바른 실제 이름", placeholder="예: 지완")
+    with col_t3:
+        st.write("") 
+        st.write("")
+        if st.button("즉시 수정", use_container_width=True):
+            if typo_input and correct_input:
+                st.session_state.temp_dict[typo_input.strip()] = correct_input.strip()
+                st.rerun()
