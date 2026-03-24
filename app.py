@@ -31,8 +31,7 @@ def calculate_uma(score):
 # ------------------------------------------------
 # 2. 웹 앱 화면 구성
 # ------------------------------------------------
-st.set_page_config(page_title="작혼 전적 정리기", page_icon="🀄", layout="centered")
-st.title("🀄 작혼 전적 자동 정리 도구")
+st.set_page_config(page_title="작혼 전적 정리기", page_icon="icon.png", layout="centered")
 
 col1, col2 = st.columns(2)
 with col1:
